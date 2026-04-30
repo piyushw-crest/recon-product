@@ -1,6 +1,6 @@
 # Recon Agent Workspace
 
-Internal repo for AI-assisted product research — thoroughly investigating vendor products, APIs, log sources, field schemas, sample data, and competitive SIEM coverage before any integration build.
+It's repository for AI-assisted product research — thoroughly investigating vendor products, APIs, log sources, field schemas, sample data, and competitive SIEM coverage before any integration build.
 
 ## Requirements
 
