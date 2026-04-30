@@ -22,8 +22,8 @@ Copy both folders into the tool config directory you use. Typical locations are 
 If `~/.cursor` does not exist yet, create it first (`mkdir -p ~/.cursor`). Then:
 
 ```bash
-git clone https://github.com/your-org/recon_agent.git
-cd recon_agent
+git clone https://github.com/piyushw-crest/recon-product.git
+cd recon-product
 cp -r skills agents ~/.cursor/
 ```
 
