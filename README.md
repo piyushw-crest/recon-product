@@ -68,7 +68,7 @@ The primary research skill. Investigates a vendor, product, or log source end-to
 - **Track B — Data source deep dive:** for REST APIs — endpoint paths, authentication flows (full OAuth2 grant-type investigation), pagination, rate limits, complete request/response examples, OpenAPI spec download and analysis; for log sources — format, sample lines, syslog structure; for cloud ingest — delivery config, message format, schema repo analysis
 - **Track C — Event types and field schema:** all distinct event types and log sources, field names/types/descriptions, enumeration values, timestamp formats, nested structures; downloads SDKs or schema repos and analyzes them programmatically for large schemas; saves representative sample events (`.json` / `.log`) to `references/sample-events/` — one file per event type
 - **Track D — Configuration and deployment:** user-facing configuration variables, vendor-side setup steps, network requirements, permissions
-- **Track E — Competitive SIEM coverage:** checks **Elastic**, **Splunk**, **Panther**, and **Rapid7** for existing integrations with the product; captures integration name, supported log sources, collection method, version, and gaps; explicitly documents absence when a platform has no coverage
+- **Track E — Competitive SIEM coverage:** checks **Elastic**, **Google SecOps**, **Splunk**, and **Sumo Logic** for existing integrations with the product; captures integration name, supported log sources, collection method, target schema, version, and gaps; explicitly documents absence when a platform has no coverage; extracts vendor-authoritative field-level schema mappings (ECS, UDM, Splunk OCSF, Sumo Logic Cloud SIEM) and merges them into `references/unified-field-mapping.md` — see [Schema mapping sources](#schema-mapping-sources) below
 
 Writes a self-contained `research-brief.md` and all companion artifacts to `research_results/<product_slug>/`. For REST APIs, also generates a `test-api.py` connectivity and pagination validation script (stdlib only, CLI + environment variable credential input, step-by-step stdout, `trace.json` + `.tar.gz` archive output).
 
@@ -121,20 +121,41 @@ Not invoked directly. Spawned in parallel by `/research-product` to handle web s
 research_results/<product_slug>/
   research-brief.md               # primary deliverable — self-contained structured brief
   test-api.py                     # API connectivity & pagination test script (REST APIs only)
-  data-model-analysis.md          # field categorisation and normalisation candidates
   configuration-plan.md           # connector configuration variables and defaults
   references/
+    unified-field-mapping.md      # schema mapping Rosetta Stone — see below
+    competitive-siem-coverage.md  # narrative integration findings per platform
     api-spec-notes.md             # endpoint details, request/response examples (REST APIs)
     log-format-notes.md           # log format details, sample lines (log-based sources)
-    field-schema-analysis.md      # complete field inventories, types, enumerations
-    competitive-siem-coverage.md  # Elastic, Splunk, Panther, Rapid7 coverage findings
     sample-events/
       <event_type>.json           # one file per event type or format variant
       <event_type>.log
-  temp/                           # raw downloaded artifacts (repos, SDKs, specs, HTML docs)
+  temp/                           # intermediate working artifacts and raw downloads
+    field-catalog.md              # raw field inventory (Track C output)
+    data-model-intermediate.md    # field categorisation (Phase 4 output)
+    ecs-field-mapping.md          # ECS mappings (Track E output, merged into unified)
+    udm-field-mapping.md          # UDM mappings (Track E output, merged into unified)
+    splunk-field-mapping.md       # Splunk OCSF mappings (Track E output, merged into unified)
+    sumo-field-mapping.md         # Sumo CSE mappings (Track E output, merged into unified)
+    <subfolder>/                  # cloned repos, SDK sources, large schema files, scripts
 ```
 
 Not all files are created for every product — only what applies to the collection method. The `temp/` directory is kept after research completes as a reference for follow-up work. Everything under `research_results/` is gitignored and stays local.
+
+## Schema mapping sources
+
+`references/unified-field-mapping.md` is a single consolidated file that maps every raw product field to all four competitive SIEM schemas side-by-side. Each schema mapping is extracted from a vendor-authoritative source — no schema is inferred.
+
+| Schema | Vendor | Authoritative source | How it is extracted |
+|--------|--------|---------------------|---------------------|
+| ECS | Elastic | Ingest pipeline YAML files (`packages/<slug>/data_stream/*/elasticsearch/ingest-pipeline/default.yml`) in [`elastic/integrations`](https://github.com/elastic/integrations) | Python script parses `rename` processors (raw field → ECS target field); `set` processors cross-checked against the integration docs "Exported fields" table |
+| UDM | Google SecOps | Parser documentation page at `https://docs.cloud.google.com/chronicle/docs/ingestion/default-parsers/<slug>` (UDM Mapping Table section); falls back to the parser change log if the docs page is unavailable | UDM mapping table captured directly from the page |
+| OCSF | Splunk | Vendor-published TA documentation (Splunkbase Documentation tab, TA GitHub README, or [`splunk/splunk-ocsf-framework`](https://github.com/splunk/splunk-ocsf-framework)) | Captured only if the TA developer has explicitly published an OCSF field mapping table — not inferred. If absent, the mapping columns are left blank and the absence is documented. |
+| Cloud SIEM schema | Sumo Logic | [`SumoLogic/cloud-siem-content-catalog`](https://github.com/SumoLogic/cloud-siem-content-catalog) — mapper rule JSON files under `mappings/` | Python script parses mapper JSON to extract `rawField → Cloud SIEM schema attribute` pairs (with record type) |
+
+The unified file includes a per-schema metadata block (source URL, version, extraction method, and any gaps or caveats) followed by a 19-column master table and an "Unmatched schema mappings" section for schema fields with no corresponding raw product field.
+
+---
 
 ## Next steps after research
 
