@@ -64,7 +64,7 @@ Read these reference files from this skill's directory to guide your research st
 
 1. `references/data-collection-methods.md` -- understand collection method types and what to investigate for each
 2. `references/research-output-template.md` -- the structure your final brief must follow
-3. `references/competitive-siem-checklist.md` -- always load this; defines where to search each of the four platforms (Elastic, Splunk, Panther, Rapid7) and what to capture
+3. `references/competitive-siem-checklist.md` -- always load this; defines where to search each of the four platforms (Elastic, Google SecOps, Splunk, Sumo Logic) and what to capture
 4. Based on the identified collection method, read the applicable checklist:
    - `references/api-research-checklist.md` -- for REST API-based collection
    - `references/log-file-research-checklist.md` -- for syslog, file-based, and local log collection
@@ -90,19 +90,26 @@ Create this directory structure:
 
 ```
 research_results/<product_slug>/
-  research-brief.md           # the main structured research brief
-  test-api.py                 # API connectivity & flow test script (API collection only)
-  references/                 # curated research artifacts for downstream consumers
-    api-spec-notes.md         # API endpoint details, request/response examples (if API)
-    log-format-notes.md       # log format details, sample lines (if log-based)
-    field-schema-analysis.md  # detailed field inventories written by subagents
-    sample-events/            # representative sample data files
-      <event_type>.json       # one file per event type or data format variant
+  research-brief.md             # the main structured research brief
+  test-api.py                   # API connectivity & flow test script (API collection only)
+  configuration-plan.md         # planned connector configuration variables
+  references/                   # curated research artifacts for downstream consumers
+    unified-field-mapping.md    # single authoritative file: per-schema source metadata +
+                                #   19-column master table (raw field × ECS/UDM/Splunk/Sumo)
+    competitive-siem-coverage.md  # narrative SIEM integration findings per platform
+    api-spec-notes.md           # API endpoint details, request/response examples (if API)
+    log-format-notes.md         # log format details, sample lines (if log-based)
+    sample-events/              # representative sample data files
+      <event_type>.json         # one file per event type or data format variant
       <event_type>.log
-  temp/                       # downloaded raw artifacts (repos, SDKs, schemas, scripts)
-    <descriptive-subfolder>/  # e.g., vendor-sdk/, schema-files/, openapi-spec/
-  data-model-analysis.md      # field categorization and normalization candidates
-  configuration-plan.md       # planned connector configuration variables
+  temp/                         # intermediate working artifacts and raw downloads
+    field-catalog.md            # raw field inventory (Track C subagent output)
+    data-model-intermediate.md  # field categorization (Phase 4 output)
+    ecs-field-mapping.md        # ECS mappings (Track E subagent output, merged into unified)
+    udm-field-mapping.md        # UDM mappings (Track E subagent output, merged into unified)
+    splunk-field-mapping.md     # Splunk OCSF mappings (Track E subagent output, merged into unified)
+    sumo-field-mapping.md       # Sumo CSE mappings (Track E subagent output, merged into unified)
+    <descriptive-subfolder>/    # cloned repos, SDK sources, large schema files, scripts
 ```
 
 Not all files are required -- create only what applies to the product's collection method.
@@ -199,7 +206,7 @@ Instruct the subagent to investigate:
 - Nested object structures
 - Which events are highest-value for security/observability use cases
 
-**For data sources with large schemas:** Instruct the subagent to download the schema source (git repo, SDK package, JSON schema file) into `temp/` and use Python to programmatically extract field inventories, type information, and enum values. The subagent should write the complete field analysis to `references/field-schema-analysis.md` (or multiple files if per-event-type breakdowns are needed) and return a summary.
+**For data sources with large schemas:** Instruct the subagent to download the schema source (git repo, SDK package, JSON schema file) into `temp/` and use Python to programmatically extract field inventories, type information, and enum values. The subagent should write the complete field analysis to `temp/field-catalog.md` (or multiple files if per-event-type breakdowns are needed) and return a summary. Include at the top of `temp/field-catalog.md`: product name, research date, and the source URL(s) / file path(s) from which the field list was extracted.
 
 Provide: product name, any documentation URLs, any sample data content from local files.
 
@@ -216,16 +223,20 @@ Provide: product name, collection method, any documentation URLs.
 
 #### Research Track E: Competitive SIEM integration coverage
 
-Instruct the subagent to check the following four platforms for existing integrations with this product: **Elastic**, **Splunk**, **Panther**, **Rapid7**.
+Instruct the subagent to check the following four platforms for existing integrations with this product: **Elastic**, **Google SecOps**, **Splunk**, **Sumo Logic**.
 
 **Full research guidance is in `references/competitive-siem-checklist.md`** (loaded at startup). Pass the entire contents of that file to the subagent in the task prompt so it has the per-platform search strategies, capture requirements, and output format without needing to load files itself.
 
 Key instructions to include in the subagent task prompt:
 - Follow the per-platform search strategy in the checklist exactly (catalogue search, GitHub repo check, documentation index)
-- For each platform: capture integration name, supported data types / log sources / endpoints, collection method, version, and any gaps
+- For each platform: capture integration name, supported data types / log sources / endpoints, target schema (ECS / UDM / OCSF/CIM / OCSF), collection method, version, and any gaps
 - If a platform has no integration: document the absence explicitly (what was searched, date) — do not leave it blank
+- **Elastic — ECS field mapping (critical):** use the ingest pipeline YAML files as the primary source. For each data stream, fetch `packages/<slug>/data_stream/<stream>/elasticsearch/ingest-pipeline/default.yml` from the `elastic/integrations` GitHub repo. Run a Python script to extract all `rename` processor entries (field → target_field). Cross-check `set` processors against the docs "Exported fields" table. The resulting table has columns: `data_stream | raw source field | ECS field (target) | ECS type | ECS description`. Write to **`temp/ecs-field-mapping.md`** using the format in the checklist. Include metadata at the top: integration slug, version, pipeline YAML source URL, docs URL, extraction method, any gaps/caveats. Also include a summary in the Elastic section of `references/competitive-siem-coverage.md`.
+- **Google SecOps — UDM field mapping (critical):** fetch the parser documentation page and capture the complete UDM mapping table (columns: Log field | UDM field | UDM type | UDM description | Logic). Write to **`temp/udm-field-mapping.md`** using the format in the checklist. Include metadata at the top: log type ID, display name, supported formats, parser docs URL, change log URL, extraction method, any gaps/caveats (e.g. "parser docs returned 404; reconstructed from change log"). Also include a summary in the Google SecOps section of `references/competitive-siem-coverage.md`.
+- **Splunk — OCSF field mapping (capture only if vendor-published):** check the TA Splunkbase Documentation tab, the TA GitHub README/docs, and `splunk/splunk-ocsf-framework` for an explicit OCSF field mapping table. Do NOT infer mappings — only capture what is published by the vendor. Write to **`temp/splunk-field-mapping.md`** (mapping table with columns `raw field | OCSF field | OCSF class | OCSF type | OCSF description` if found, or a structured absence note if not). Include metadata at the top: TA name, Splunkbase URL, whether OCSF mapping was vendor-published, any gaps/caveats. Also include a summary in the Splunk section of `references/competitive-siem-coverage.md`.
+- **Sumo Logic — Cloud SIEM mapper rules (critical):** clone `https://github.com/SumoLogic/cloud-siem-content-catalog` into `temp/cloud-siem-content-catalog/`. Search the `mappings/` directory for the product. Run a Python script to parse the mapper JSON files and extract `rawField → fields` pairs (with `recordType`). Enrich with CSE schema attribute type and description from `https://help.sumologic.com/docs/cse/schema/schema-attributes/`. Write to **`temp/sumo-field-mapping.md`** with columns `raw field | CSE attribute | record type | CSE type | CSE description`. Include metadata at the top: mapper file path, mapper GitHub URL, record types covered, extraction method, any gaps/caveats. Also include a summary in the Sumo Logic section of `references/competitive-siem-coverage.md`.
 - Write full findings to `references/competitive-siem-coverage.md` using the output format defined in the checklist
-- Return a concise summary with the file path and a one-line status per platform (found / not found)
+- Return a concise summary with the file path and a one-line status per platform (found / not found), plus confirmation that all four intermediate mapping files were written to `temp/`: `ecs-field-mapping.md`, `udm-field-mapping.md`, `splunk-field-mapping.md`, `sumo-field-mapping.md`. These are intermediate artifacts — the orchestrator will merge them into `references/unified-field-mapping.md` in Phase 6.
 
 Provide: product name, vendor name, full contents of `references/competitive-siem-checklist.md`.
 
@@ -255,7 +266,7 @@ Perform a field categorization and normalization analysis:
 2. Identify which fields are highest-value for filtering, correlation, and alerting in any SIEM or observability platform.
 3. Note normalization candidates — fields that would map well to common security data models (OCSF, CIM, ECS, Chronicle UDM, etc.) — but do not commit to any specific schema. The choice of target schema is a downstream implementation decision.
 4. Note IP address fields that are strong candidates for geo or ASN enrichment.
-5. Write the analysis to `data-model-analysis.md`.
+5. Write the analysis to `temp/data-model-intermediate.md`. Format: one row per field with columns `field | category | high-value (yes/no) | normalization candidates | enrichment candidate (yes/no)`. This file is an intermediate artifact used in Phase 6 to populate the `Category` column of `references/unified-field-mapping.md`.
 
 ### Phase 5: Configuration planning
 
@@ -271,6 +282,47 @@ Based on the identified collection method, plan the connector configuration:
 Compile the full research brief following the template in `references/research-output-template.md`. Write it to `research_results/<product_slug>/research-brief.md`.
 
 The brief must be self-contained -- a reader should be able to use it as the primary input to any integration build workflow and have everything they need.
+
+**Step 6a — Build `references/unified-field-mapping.md` (do this before writing the brief):**
+
+Read the six intermediate files written by Track C, Phase 4, and Track E, then merge them into the single authoritative unified mapping file:
+
+1. Read `temp/field-catalog.md` → canonical raw field list (each row becomes a row in the unified table; provides `Raw field`, `Description`, `Data type` columns)
+2. Read `temp/data-model-intermediate.md` → field category per raw field (provides `Category` column)
+3. Read `temp/ecs-field-mapping.md` → ECS mapping per raw field (provides `ECS field`, `ECS type`, `ECS description` columns; also extract ECS metadata block)
+4. Read `temp/udm-field-mapping.md` → UDM mapping per raw field (provides `UDM field`, `UDM type`, `UDM description`, `UDM logic` columns; also extract UDM metadata block)
+5. Read `temp/splunk-field-mapping.md` → Splunk OCSF mapping per raw field (provides `Splunk OCSF field`, `Splunk OCSF class`, `Splunk OCSF type`, `Splunk OCSF description` columns; also extract Splunk metadata block)
+6. Read `temp/sumo-field-mapping.md` → Sumo CSE mapping per raw field (provides `Sumo CSE attribute`, `Sumo record type`, `Sumo CSE type`, `Sumo CSE description` columns; also extract Sumo metadata block)
+
+Join rule: match rows by raw field name (exact match first; suffix/partial match as fallback for cases like `jsonPayload.requesterIP` vs `requesterIP`). Schema mapping entries that cannot be joined to any raw field go into a `### Unmatched schema mappings` section at the bottom with a note. Use `—` for any cell where a schema has no mapping for that field.
+
+Write `references/unified-field-mapping.md` with this structure:
+- **Product context** table (product, vendor, research date, raw field source)
+- **ECS source metadata** table (integration found, slug, version, pipeline YAML URL, docs URL, extraction method, gaps/caveats)
+- **UDM source metadata** table (parser found, log type ID, display name, supported formats, parser docs URL, change log URL, extraction method, gaps/caveats)
+- **Splunk OCSF source metadata** table (TA found, TA name, Splunkbase URL, OCSF mapping published yes/no, source URL, extraction method, gaps/caveats)
+- **Sumo Logic Cloud SIEM source metadata** table (mapper rule found, mapper file path, mapper GitHub URL, record types covered, extraction method, gaps/caveats)
+- **19-column field mapping table** with header: `Raw field | Description | Data type | Category | ECS field | ECS type | ECS description | UDM field | UDM type | UDM description | UDM logic | Splunk OCSF field | Splunk OCSF class | Splunk OCSF type | Splunk OCSF description | Sumo CSE attribute | Sumo record type | Sumo CSE type | Sumo CSE description`
+- **Unmatched schema mappings** section for any schema fields that had no raw field match
+
+If any intermediate file is missing, write the appropriate "not found" / "not published" values in that schema's metadata table and use `—` for all cells in that schema's columns.
+
+**Step 6b — Write section 4.3 of the research brief:**
+
+Section 4.3 in the brief shows a condensed cross-reference table (field paths only, no descriptions) followed by a pointer to the full unified file:
+
+```
+#### Schema field mapping (all platforms)
+
+> Full mapping with raw types, per-schema descriptions, field categories, and source metadata is in
+> `references/unified-field-mapping.md`.
+
+| Raw field | ECS field | UDM field | Splunk OCSF field | Sumo CSE attribute |
+|-----------|-----------|-----------|-------------------|--------------------|
+| <field>   | <ecs.f>   | <udm.f>   | <ocsf.f or —>     | <cse.attr or —>    |
+```
+
+Do not reproduce the full 19-column table inline in the brief — reference the file instead.
 
 ### Phase 7: API test script (API collection only)
 

@@ -36,15 +36,16 @@ Every section below should be populated. If a section does not apply, include it
 ### 1.4 Competitive SIEM integration coverage
 
 Which of the four named SIEM/security platforms already ship an integration for this product?
-Check: **Elastic**, **Splunk**, **Panther**, **Rapid7**.
+Check: **Elastic**, **Google SecOps**, **Splunk**, **Sumo Logic**.
 
-| Integration name | Vendor | Supported data types / log sources / endpoints | Collection method | Source URL | Notes / gaps |
-|-----------------|--------|------------------------------------------------|-------------------|------------|--------------|
-| <integration name> | <Elastic / Splunk / Panther / Rapid7> | <e.g., "Alerts API, Audit Logs API", "firewall.log, ids.log"> | <REST API / syslog / S3 / etc.> | <link to integration page> | <version, gaps, deprecated?> |
+| Integration name | Vendor | Supported data types / log sources / endpoints | Schema | Collection method | Source URL | Notes / gaps |
+|-----------------|--------|------------------------------------------------|--------|-------------------|------------|--------------|
+| <integration name> | <Elastic / Google SecOps / Splunk / Sumo Logic> | <e.g., "Alerts API, Audit Logs API", "firewall.log, ids.log"> | <ECS / UDM / OCSF/CIM / OCSF> | <REST API / syslog / S3 / etc.> | <link to integration page> | <version, gaps, deprecated?> |
 
 > If a platform has no integration for this product, add a row with "None found" in the Integration name column, the vendor name, and a note "No integration found as of <research date>."
 
 See `references/competitive-siem-coverage.md` for the detailed findings written during research.
+See `references/unified-field-mapping.md` for the full unified field mapping table (all four schemas: ECS, UDM, Splunk OCSF, Sumo Logic Cloud SIEM) with per-schema source metadata, field descriptions, and data types.
 
 ## 2. Data Collection Method
 
@@ -192,6 +193,22 @@ See `references/competitive-siem-coverage.md` for the detailed findings written 
 | <field> | <type> | <description> | <example> |
 
 <Repeat for each event type.>
+
+#### Schema field mapping (all platforms)
+
+> Full mapping with raw types, per-schema descriptions, field categories, and source metadata is in
+> `references/unified-field-mapping.md`.
+> That file contains: product context, per-schema source metadata (integration found, source URLs, version,
+> extraction method, gaps/caveats), and a 19-column master table covering ECS, UDM, Splunk OCSF, and Sumo Logic
+> Cloud SIEM mappings side-by-side for every raw product field.
+
+| Raw field | ECS field | UDM field | Splunk OCSF field | Sumo CSE attribute |
+|-----------|-----------|-----------|-------------------|--------------------|
+| <field>   | <ecs.f or —> | <udm.f or —> | <ocsf.f or —> | <cse.attr or —> |
+
+<Populate this condensed table from `references/unified-field-mapping.md` (field path columns only).
+If an entire schema has no integration/parser, all cells in that column are — and the unified file's metadata section explains why.>
+
 
 ### 4.4 Sample data
 
@@ -350,9 +367,16 @@ The brief should be thorough enough that someone can pass it directly to any int
 The research brief is the primary output, but it is supported by additional files in the same directory:
 
 - **`test-api.py`** -- *(API collection only)* Standalone Python script that exercises the exact API flow proposed for the connector. Tests connectivity, authentication, pagination, and response structure. Run it against the real vendor API and share the resulting archive for development. See `references/test-api-script-spec.md` in the skill directory for the full specification.
-- **`data-model-analysis.md`** -- Field categorization and normalization candidates, written during Phase 4.
 - **`configuration-plan.md`** -- Full connector configuration variable plan, written during Phase 5.
-- **`references/`** -- Curated research artifacts: detailed field analyses, API spec notes, sample events. These are polished enough for downstream consumers.
-- **`temp/`** -- Raw downloaded artifacts: cloned repos, SDK sources, large schema files, analysis scripts. Retained as reference for the human and for reproducibility.
+- **`references/`** -- Curated research artifacts polished enough for downstream consumers:
+  - **`unified-field-mapping.md`** -- Single authoritative file: product context, per-schema source metadata, and a 19-column master table mapping every raw product field to ECS (Elastic), UDM (Google SecOps), Splunk OCSF, and Sumo Logic Cloud SIEM schemas side-by-side.
+  - **`competitive-siem-coverage.md`** -- Narrative competitive SIEM integration findings per platform.
+  - **`log-format-notes.md`** -- Log collection mechanics (formats, file paths, syslog config). *(log-based products only)*
+  - **`sample-events/`** -- Representative sample events per event type.
+- **`temp/`** -- Intermediate working artifacts and raw downloads (not required for downstream use, retained for reproducibility):
+  - `field-catalog.md` -- Raw field inventory written by Track C subagent.
+  - `data-model-intermediate.md` -- Field categorization written during Phase 4.
+  - `ecs-field-mapping.md`, `udm-field-mapping.md`, `splunk-field-mapping.md`, `sumo-field-mapping.md` -- Per-schema mapping files written by Track E subagent. The orchestrator merges these into `references/unified-field-mapping.md` in Phase 6.
+  - Cloned repos, SDK sources, large schema files, analysis scripts.
 
 When the brief references detailed findings that are too large to include inline, it should point to the appropriate file in `references/` or `temp/` with a path and one-line description.
